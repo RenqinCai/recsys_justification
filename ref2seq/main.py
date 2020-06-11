@@ -26,6 +26,7 @@ def parse():
     parser.add_argument('-dedp', '--decoder_dropout', type=float, default=0.2, help='Decoder dropout rate')
     parser.add_argument('-s', '--save', type=float, default=10000, help='Save every s iterations')
     parser.add_argument('-sa', '--sample', action='store_true', help='Use sampling to generation')
+    parser.add_argument('--data_dir', type=str, help='data directory')
 
     args = parser.parse_args()
     return args
@@ -44,14 +45,17 @@ def run(args):
     reverse, fil, n_epoch, print_every, learning_rate, n_layers, hidden_size, batch_size, beam_size, input = args.reverse, args.filter, args.epoch, args.print, args.learning_rate, args.layer, args.hidden, args.batch_size, args.beam, args.input
 
     if args.train and not args.load:
+        print("=="*20, "train", "=="*20)
         trainIters(args, args.train, reverse, n_epoch, learning_rate, batch_size,
                     n_layers, hidden_size, print_every)
     elif args.load:
+        print("=="*20, "load", "=="*20)
         n_layers, hidden_size = parseFilename(args.load)
         trainIters(args, args.train, reverse, n_epoch, learning_rate, batch_size,
                     n_layers, hidden_size, print_every, loadFilename=args.load)
     # load parameters from filename
-    elif args.test: 
+    elif args.test:
+        print("=="*20, "test", "=="*20)
         n_layers, hidden_size  = parseFilename(args.test, True)
         runTest(args, n_layers, hidden_size, reverse, args.test, beam_size, batch_size, input, args.corpus)
 

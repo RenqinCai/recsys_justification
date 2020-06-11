@@ -56,173 +56,11 @@ def tylib_tokenize(x, setting='split', lower=False,
         tokens = [tweet_processer(x) for x in tokens]
     return tokens
 
-def word_to_index(word, word_index, unk_token=1):
-    ''' Maps word to index.
-
-    Arg:
-        word: `str`. Word to be converted
-        word_index: `dict`. dictionary of word-index mapping
-        unk_token: `int`. token to label if OOV
-
-    Returns:
-        idx: `int` Index of word converted
-    '''
-    try:
-        idx = word_index[word]
-    except:
-        idx = 1
-    return idx
-
 porter_stemmer = PorterStemmer()
 from nltk.corpus import wordnet as wn
 
 stemmer = porter_stemmer
 
-def build_kb_feats(data):
-    kb_left, kb_right = [], []
-    for x in tqdm(data):
-        k1, k2 = extract_kb_feats(x)
-        kb_left.append(k1)
-        kb_right.append(k2)
-    return kb_left, kb_right
-
-def extract_kb_feats(x, num_feats=3):
-
-    def flip(x):
-        if(x==1):
-            return 0
-        elif(x==0):
-            return 1
-
-    def check_pos(x):
-        allow = ['NN', 'VB','JJ','RB']
-        for a in allow:
-            if(a in x):
-                return 1
-        return 0
-
-    q1, q2, p1, p2 = x[0], x[1], x[2], x[3]
-
-    # print('----------------------')
-    # print(len(q1))
-    # print(len(p1))
-    # print(len(q2))
-    # print(len(p2))
-    # if(len(p2)!=len(q2)):
-    #     print(p2)
-    #     print(q2)
-    kb_grid = np.zeros((num_feats, len(q1), len(q2)))
-    kb_grid2 = np.zeros((num_feats, len(q2), len(q1)))
-    # print(kb_grid.shape)
-    for i, a in enumerate(q1):
-        for j, b in enumerate(q2):
-            # Check antonyms
-            pa = check_pos(p1[i])
-            pb = check_pos(p2[j])
-
-            if(pa==0 or pb==0):
-                continue
-
-            is_ant = is_antonyms(a, b)
-            kb_grid[0][i][j] = is_ant
-            kb_grid2[0][j][i] = is_ant
-
-            is_hypo = has_relation(a, b)
-            kb_grid[1][i][j] = is_hypo[0]
-            kb_grid[2][i][j] = is_hypo[1]
-            kb_grid2[1][j][i] = flip(is_hypo[0])
-            kb_grid2[2][j][i] = flip(is_hypo[1])
-
-    k1 = np.max(kb_grid, axis=2).tolist()
-    k2 = np.max(kb_grid2, axis=2).tolist()
-    return k1, k2
-
-def is_antonyms(token1, token2):
-    token1 = token1.lower()
-    token2 = token2.lower()
-    token1_stem = stemmer.stem(token1)
-    antonym_lists_for_token2 = []
-    for synsets in wn.synsets(token2):
-        for l in synsets.lemmas():
-            _ant = l.antonyms()
-            if(len(_ant)>0):
-                antonym_lists_for_token2.append(_ant[0].name())
-
-        # for lemma_synsets in [wn.synsets(l) for l in synsets.lemma_names()]:
-        #     for lemma_syn in lemma_synsets:
-        #         for lemma in lemma_syn.lemmas():
-        #             for antonym in lemma.antonyms():
-                        # antonym_lists_for_token2.append(antonym.name())
-    antonym_lists_for_token2 = list(set(antonym_lists_for_token2))
-    for atnm in antonym_lists_for_token2:
-        if token1_stem == stemmer.stem(atnm):
-            return 1
-    return 0
-
-def get_hyponyms(x):
-    return set([i for i in x.closure(lambda s:s.hyponyms(), depth=1)])
-
-def get_hypernyms(x):
-    return set([i for i in x.closure(lambda s:s.hypernyms(), depth=1)])
-
-def has_relation(token1, token2, rel_name=""):
-    token1 = token1.lower()
-    token2 = token2.lower()
-    t1 = stemmer.stem(token1)
-    t2 = stemmer.stem(token2)
-    _t1 = wn.synsets(t1)
-    _t2 = wn.synsets(t2)
-
-    if(len(_t1)==0 or len(_t2)==0):
-        return [0,0]
-
-    token_2_hyponyms = get_hyponyms(_t2[0])
-    token_2_hypernyms = get_hypernyms(_t2[0])
-
-    if(_t1[0] in token_2_hyponyms):
-        # t1 is a hyponym of t2
-        # print("Hyponym {} {}".format(t1, t2))
-        return [1,0]
-    elif(_t1[0] in token_2_hypernyms):
-        # t1 is a hypernym of t2
-        return [0,1]
-    else:
-        return [0,0]
-
-def build_em_feats(data, stem=False, lower=False):
-    em_left, em_right = [],[]
-    for x in tqdm(data):
-        em1, em2 = exact_match_feats(x[0], x[1], stem=stem, lower=lower)
-        em_left.append(em1)
-        em_right.append(em2)
-    return em_left, em_right
-
-def exact_match_feats(q1, q2, stem=False, lower=False):
-    """ builds exact match features
-
-    Pass in tokens.
-    """
-    if(lower):
-        q1 = [x.lower() for x in q1]
-        q2 = [x.lower() for x in q2]
-    if(stem):
-        q1 = [porter_stemmer.stem(x) for x in q1]
-        q2 = [porter_stemmer.stem(x) for x in q2]
-    a_em = []
-    b_em = []
-    for a in q1:
-        check_b = [x for x in q2 if a==x]
-        if(len(check_b)>0):
-            a_em.append(1)
-        else:
-            a_em.append(0)
-    for b in q2:
-        check_a = [x for x in q1 if b==x]
-        if(len(check_a)>0):
-            b_em.append(1)
-        else:
-            b_em.append(1)
-    return a_em, b_em
 
 import io
 import string
@@ -241,22 +79,6 @@ def load_vectors(fname):
             # print(tokens[0])
             data[tokens[0].decode('utf-8')] = np.array(tokens[1:])
     return data
-
-
-def sequence_to_indices(seq, word_index, unk_token=1):
-    ''' Converts sequence of text to indices.
-
-    Args:
-        seq: `list`. list of list of words
-        word_index: `dict`. dictionary of word-index mapping
-
-    Returns:
-        seq_idx: `list`. list of list of indices
-
-    '''
-    # print(seq)
-    seq_idx = [word_to_index(x, word_index, unk_token=unk_token) for x in seq]
-    return seq_idx
 
 def build_word_index(words, min_count=1, extra_words=['<pad>','<unk>'],
                         lower=True):
@@ -466,7 +288,6 @@ def build_embeddings(word_index, index_word, num_extra_words=2,
                                         dimensions), matrix)
         print("Saved to file..")
 
-
 def dictToFile(dict, path):
     ''' Writes to gz format
 
@@ -481,7 +302,6 @@ def dictToFile(dict, path):
     print("Writing to {}".format(path))
     with open(path, 'w') as f:
         f.write(json.dumps(dict))
-
 
 def dictFromFileUnicode(path):
     ''' Reads File from Path

@@ -92,8 +92,6 @@ def beam_decode(decoder, decoder_hidden, outU, outB, voc, beam_size, max_length=
     n = min(len(terminal_sentences), 3) # top 3?
     return terminal_sentences[:n]
 
-
-
 def beam_decode_batch(decoder, decoder_hidden, outU, outB, voc, beam_size, batch_size, max_length=MAX_LENGTH):
     # these list should include all samples in the batch
     terminal_sentences, prev_top_sentences, next_top_sentences = [], [], []
@@ -145,7 +143,6 @@ def beam_decode_batch(decoder, decoder_hidden, outU, outB, voc, beam_size, batch
     
     return terminal_sentences
 
-
 def decode(decoder, decoder_hidden, outU, outB, voc, batch_size, max_length=MAX_LENGTH):
 
     decoder_input = Variable(torch.LongTensor([[SOS_token]]))
@@ -172,7 +169,6 @@ def decode(decoder, decoder_hidden, outU, outB, voc, batch_size, max_length=MAX_
         decoder_input = decoder_input.cuda() if USE_CUDA else decoder_input
 
     return decoded_words
-
 
 def evaluate(encoderU, encoderB, decoder, voc, \
              user_input_variable, business_input_variable, \
@@ -204,19 +200,24 @@ def evaluateRandomly(encoderU, encoderB, decoder, voc, \
     path = "./metrics/"
     batch_size = len(input_index) # batch_size
     
+    f1 = open(path + "ref_new_beam.txt",'w')
+    f2 = open(path + "tst_new_beam.txt",'w')
+
     user_index = [inp[0] for inp in input_index]
     business_index = [inp[1] for inp in input_index]
     
     target_words_list = [[voc.index_word[str(x)] for x in inp] for inp in target_variable.tolist()] # consider each sample in the batch
     for target_words in target_words_list:
-        print(" ".join(target_words[1:]))
+        # print(" ".join(target_words[1:]))
+        f1.write(" ".join(target_words[1:])+"\n")
         
     if beam_size == 1:
         output_words = evaluate(encoderU, encoderB, decoder, voc, \
                                 user_input_variable, business_input_variable, \
                                 ser_lengths, business_lengths, target_variable, \
                                 mask, max_target_len, beam_size, batch_size)
-        print(" ".join(output_words[:-1]))
+        # print(" ".join(output_words[:-1]))
+        f2.write(" ".join(target_words[1:])+"\n")
     else:
         output_words_list = evaluate(encoderU, encoderB, decoder, voc, \
                                 user_input_variable, business_input_variable, \
@@ -225,9 +226,8 @@ def evaluateRandomly(encoderU, encoderB, decoder, voc, \
         for output_words in output_words_list:
             # take the top candidate of the beam 
             output_words, score = output_words[0] 
-            #f2.write(" ".join(output_words[:-1]) + "\n")
-            print(" ".join(output_words[:-1]))
- 
+            f2.write(" ".join(output_words[:-1]) + "\n")
+            # print(" ".join(output_words[:-1]))
 
 # do not need mask since no edu will appear 
 def batchify(pairs, user_review, user_length, business_review, business_length, bsz, evaluation=False):
@@ -243,6 +243,7 @@ def batchify(pairs, user_review, user_length, business_review, business_length, 
         data.append(batch2TrainData(user_review, user_length, business_review, business_length, pairs[nbatch * bsz: len(pairs)], evaluation))
     return data
 
+
 def batch2TrainData(user_review, user_length, business_review, business_length, pair_batch, evaluation=False):
     
     input_batch, output_batch = [], []
@@ -256,8 +257,8 @@ def batch2TrainData(user_review, user_length, business_review, business_length, 
     review_input, input_length = inputVar(input_batch, input_length, evaluation=evaluation)
     output, mask, max_target_len = outputVar(output_batch) # convert sentence to ids and padding
     return input_index, review_input, input_length, output, mask, max_target_len
-    
-    
+
+
 def runTest(args, n_layers, hidden_size, reverse, modelFile, beam_size, batch_size, input, corpus):
 
     data, length = loadPrepareData(args)
@@ -292,11 +293,15 @@ def runTest(args, n_layers, hidden_size, reverse, modelFile, beam_size, batch_si
         encoderU = encoderU.cuda()
         encoderB = encoderB.cuda()
         decoder = decoder.cuda()    
-        
+    
+
+
     if not args.sample:
         # evaluate on test
-        for test_batch in tqdm(test_batches):
-
+        # for test_batch in tqdm(test_batches):
+        for test_i, test_batch in enumerate(test_batches):
+            if test_i > 1:
+                break
             input_index, input_variable, lengths, target_variable, mask, max_target_len = test_batch
             user_input_variable, business_input_variable = input_variable
             user_lengths, business_lengths = lengths
@@ -309,8 +314,7 @@ def runTest(args, n_layers, hidden_size, reverse, modelFile, beam_size, batch_si
     else:
         # evaluate using sample 
         sample(encoderU, encoderB, decoder, voc, test_batches, reverse)
-        
-
+     
 # top-k sample 
 def sample(encoderU, encoderB, decoder, voc, test_batches, reverse, n_words=MAX_LENGTH):
     
@@ -320,8 +324,8 @@ def sample(encoderU, encoderB, decoder, voc, test_batches, reverse, n_words=MAX_
     STOP_TOKEN = idx2word[str(EOS_token)]
     
     path = "./metrics/"
-    f1 = open(path + "ref-new.txt",'w')
-    f2 = open(path + "tst-new.txt",'w')
+    f1 = open(path + "ref_new.txt",'w')
+    f2 = open(path + "tst_new.txt",'w')
     
     # Here is how to use this function for top-p sampling
     temperature = 1.0
@@ -359,9 +363,7 @@ def sample(encoderU, encoderB, decoder, voc, test_batches, reverse, n_words=MAX_
         sentences = []
         for i in range(n_words):
             
-            decoder_output, decoder_hidden, user_decoder_attn, business_decoder_attn = decoder(
-                decoder_input, decoder_hidden, outU, outB
-            )
+            decoder_output, decoder_hidden, user_decoder_attn, business_decoder_attn = decoder(decoder_input, decoder_hidden, outU, outB)
             
             logits = decoder_output.transpose(0, 1) # 1xBxV -> Bx1xV
             logits = logits / temperature
@@ -383,17 +385,16 @@ def sample(encoderU, encoderB, decoder, voc, test_batches, reverse, n_words=MAX_
                     else:
                         _sentences[i].append(idx2word[str(word_idx)])
         
+        # for _sentence in _sentences:
+        #     sentence = " ".join(_sentence)
+        #     #print(_sentence)
+        #     f2.write(sentence + "\n")
         
-        for _sentence in _sentences:
-            sentence = " ".join(_sentence)
-            #print(_sentence)
-            f2.write(sentence + "\n")
         
     f1.close()
     f2.close()        
-        
 
-        
+  
 def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
     """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
         Args:
@@ -427,6 +428,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
         logits = torch.where(probs < batch_mins, torch.tensor(float('-inf')).to(logits), logits)
     
     return logits
+
 
 # # Here is how to use this function for top-p sampling
 # temperature = 1.0

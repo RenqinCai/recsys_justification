@@ -38,6 +38,8 @@ def maskNLLLoss(input, target, mask):
 def train(user_input_variable, business_input_variable, user_lengths, business_lengths,target_variable, mask, 
         max_target_len, encoderU, encoderB, decoder, embedding, encoderU_optimizer, encoderB_optimizer, decoder_optimizer, batch_size, max_length=MAX_LENGTH):
 
+    mask = mask.bool()
+
     encoderU_optimizer.zero_grad()
     encoderB_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
@@ -115,6 +117,7 @@ def train(user_input_variable, business_input_variable, user_lengths, business_l
 def evaluate(user_input_variable, business_input_variable, user_lengths, business_lengths, target_variable, mask, max_target_len, encoderU, encoderB,
              decoder, embedding, encoderU_optimizer, encoderB_optimizer, decoder_optimizer, max_length=MAX_LENGTH):
 
+    mask = mask.bool()
     encoderU.eval()
     encoderB.eval()
     decoder.eval()
@@ -213,8 +216,7 @@ def trainIters(args, corpus, reverse, n_epoch, learning_rate, batch_size, n_laye
     print(len(data.train))
     print(len(data.dev))
     print(len(data.test))
-    exit(0)
-
+    # exit(0)
 
     user_length, item_length = length #, user_length2, item_length2 = length
     train_batches = batchify(data.train, data.user_text, user_length, data.item_text, item_length, batch_size, train_mask_idx=data.train_mask_idx, shuffle=True)
@@ -274,9 +276,10 @@ def trainIters(args, corpus, reverse, n_epoch, learning_rate, batch_size, n_laye
             input_variable, lengths, target_variable, mask, max_target_len = training_batch
             user_input_variable, business_input_variable = input_variable
             user_lengths, business_lengths = lengths
-            if batch+5 % 1000 == 5:
-                print("user_lengths: ", user_lengths)
+            # if batch+5 % 1000 == 5:
+            #     print("user_lengths: ", user_lengths)
 
+            mask = mask.bool()
             loss = train(user_input_variable, business_input_variable, user_lengths, business_lengths,target_variable, mask, 
                         max_target_len, encoderU, encoderB, decoder, embedding, encoderU_optimizer, encoderB_optimizer, decoder_optimizer, batch_size)
             print_loss += loss
@@ -301,6 +304,7 @@ def trainIters(args, corpus, reverse, n_epoch, learning_rate, batch_size, n_laye
             user_input_variable, business_input_variable = input_variable
             user_lengths, business_lengths = lengths
 
+            mask = mask.bool()
             loss = evaluate(user_input_variable, business_input_variable, user_lengths, business_lengths, target_variable, mask, max_target_len, encoderU, encoderB,
                              decoder, embedding, encoderU_optimizer, encoderB_optimizer, decoder_optimizer, batch_size)
             val_loss += loss
@@ -329,21 +333,39 @@ def trainIters(args, corpus, reverse, n_epoch, learning_rate, batch_size, n_laye
             }, os.path.join(directory, '{}_{}.tar'.format(epoch, filename(reverse, 'expansion_model'))))
             best_val_loss = val_loss
      
-            # Run on test data.
-            test_loss = 0
-            for test_batch in test_batches:
-                input_variable, lengths, target_variable, mask, max_target_len = test_batch
-                user_input_variable, business_input_variable = input_variable
-                user_lengths, business_lengths = lengths
+            # # Run on test data.
+            # test_loss = 0
+            # for test_batch in test_batches:
+            #     input_variable, lengths, target_variable, mask, max_target_len = test_batch
+            #     user_input_variable, business_input_variable = input_variable
+            #     user_lengths, business_lengths = lengths
 
-                loss = evaluate(user_input_variable, business_input_variable, user_lengths, business_lengths, target_variable, mask, max_target_len, encoderU, encoderB,
-                          decoder, embedding, encoderU_optimizer, encoderB_optimizer, decoder_optimizer, batch_size)
-                test_loss += loss
-            test_loss /= len(test_batches)
-            print('-' * 89)
-            print('| test loss {:5.2f} | test ppl {:8.2f}'.format(
-            test_loss, math.exp(test_loss)))
-            print('-' * 89)
+            #     mask = mask.bool()
+            #     loss = evaluate(user_input_variable, business_input_variable, user_lengths, business_lengths, target_variable, mask, max_target_len, encoderU, encoderB,
+            #               decoder, embedding, encoderU_optimizer, encoderB_optimizer, decoder_optimizer, batch_size)
+            #     test_loss += loss
+            # test_loss /= len(test_batches)
+            # print('-' * 89)
+            # print('| test loss {:5.2f} | test ppl {:8.2f}'.format(
+            # test_loss, math.exp(test_loss)))
+            # print('-' * 89)
 
         if val_loss > best_val_loss: # early stop
+            print("XXX"*20, "early stopping", "XXX"*20)
             break
+
+    test_loss = 0
+    for test_batch in test_batches:
+        input_variable, lengths, target_variable, mask, max_target_len = test_batch
+        user_input_variable, business_input_variable = input_variable
+        user_lengths, business_lengths = lengths
+
+        mask = mask.bool()
+        loss = evaluate(user_input_variable, business_input_variable, user_lengths, business_lengths, target_variable, mask, max_target_len, encoderU, encoderB,
+                  decoder, embedding, encoderU_optimizer, encoderB_optimizer, decoder_optimizer, batch_size)
+        test_loss += loss
+    test_loss /= len(test_batches)
+    print('-' * 89)
+    print('| test loss {:5.2f} | test ppl {:8.2f}'.format(
+    test_loss, math.exp(test_loss)))
+    print('-' * 89)

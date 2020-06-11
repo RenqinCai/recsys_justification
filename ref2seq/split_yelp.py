@@ -4,9 +4,7 @@ from collections import defaultdict
 from collections import Counter
 import re
 import gzip
-#from keras.preprocessing import sequence
 import numpy as np
-#import codecs
 import operator
 import datetime
 import csv
@@ -23,7 +21,6 @@ args = parser.parse_args()
 in_fp = './data/{}/{}_filter_flat_positive.large.json'.format(args.dataset, args.dataset)
 
 limit = 99999999999
-# top_k_words = 10000
 min_reviews = 5
 max_words = 1500
 
@@ -51,7 +48,6 @@ with open(in_fp, 'r') as f:
         item_count[item] += 1
 
 pairs = set()
-#with gzip.open(in_fp, 'r') as f:
 with open(in_fp, 'r') as f:
     for i,line in tqdm(enumerate(f), desc = "2nd pass of reviews"):
         if(i>limit):
@@ -63,8 +59,6 @@ with open(in_fp, 'r') as f:
         rating = None
         time = d['date']
         ts = time
-        # ts = int(datetime.datetime.strptime(time,
-        #                     '%Y-%m-%d').strftime("%s"))
 
         if (user, item) in pairs:
             continue
@@ -77,14 +71,10 @@ with open(in_fp, 'r') as f:
         interactions[user].append([item, rating, ts, text])
 
 print("Number of users={}".format(len(interactions)))
-# Filter interactions 2nd time
 
 new_interactions = defaultdict(list)
 new_items = []
 for key, value in interactions.items():
-    # if(len(value)<min_reviews):
-    #     continue
-    # else:
     new_interactions[key] = value
     new_items += [x[0] for x in value]
 
@@ -139,14 +129,10 @@ for t in train:
 
 for t in test:
     if t[1] not in item_repr:
-        # print('***')
-        # print(t[1])
         item_repr[t[1]].append('')
 
 for t in dev:
     if t[1] not in item_repr:
-        # print('****')
-        # print(t[1])
         item_repr[t[1]].append('')
 
 print(list(user_repr.items())[0])
